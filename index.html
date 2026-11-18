@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Drag Racer - Trabalho Escolar</title>
+    <style>
+        /* Estilo geral da página para centralizar o jogo e manter o visual retrô */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        body {
+            background-color: #121218;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        h1 {
+            color: #ffcc00;
+            text-shadow: 3px 3px 0px #cc3300;
+            margin-bottom: 10px;
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+        #game-container {
+            position: relative;
+            border: 4px solid #444;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.8);
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated; /* Mantém os pixels nítidos */
+        }
+        /* Telas sobrepostas (Garagem e Resultados) */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 25, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .money-display {
+            font-size: 22px;
+            color: #4ade80;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .garage-grid {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .box {
+            background: #222230;
+            border: 2px solid #555;
+            padding: 15px;
+            border-radius: 4px;
+            width: 240px;
+        }
+        .box h3 {
+            color: #ffcc00;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        button {
+            background-color: #e63946;
+            color: white;
+            border: 2px solid #fff;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            width: 100%;
+            transition: transform 0.1s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #ff4d5a;
+            transform: scale(1.03);
+        }
+        button:disabled {
+            background-color: #555;
+            border-color: #777;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .btn-race {
+            background-color: #2a9d8f;
+            font-size: 20px;
+            padding: 12px 30px;
+            width: auto;
+            margin-top: 10px;
+        }
+        .btn-race:hover {
+            background-color: #38b2a3;
+        }
+        .color-picker {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #fff;
+            cursor: pointer;
+            padding: 0;
+        }
+        .controls-hint {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        span.key {
+            background: #333;
+            color: #fff;
+            padding: 2px 6px;
+            border: 1px solid #666;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PIXEL DRAG RACER</h1>
+
+    <div id="game-container">
+        <!-- Tela principal onde o jogo é desenhado -->
+        <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+        <!-- TELA 1: GARAGEM E CUSTOMIZAÇÃO -->
+        <div id="garage-screen" class="overlay">
+            <h2 style="color: #fff; margin-bottom: 5px;">GARAGEM</h2>
+            <div class="money-display">Dinheiro: R$ <span id="money-text">500</span></div>
+
+            <div class="garage-grid">
+                <!-- Coluna de Pintura -->
+                <div class="box">
+                    <h3>PINTURA</h3>
+                    <p style="font-size: 12px; color: #ccc;">Escolha a cor do carro:</p>
+                    <div class="color-picker">
+                        <button class="color-btn" style="background: #e63946;" onclick="changeColor('#e63946')"></button>
+                        <button class="color-btn" style="background: #3a86ff;" onclick="changeColor('#3a86ff')"></button>
+                        <button class="color-btn" style="background: #ffbe0b;" onclick="changeColor('#ffbe0b')"></button>
+                        <button class="color-btn" style="background: #8338ec;" onclick="changeColor('#8338ec')"></button>
+                        <button class="color-btn" style="background: #f8f9fa;" onclick="changeColor('#f8f9fa')"></button>
+                    </div>
+                    <div style="margin-top: 20px; font-size: 12px; color: #aaa; text-align: left;">
+                        <strong>Dica de Piloto:</strong><br>
+                        Troque a marcha quando o RPM entrar na <span style="color:#4ade80;">zona verde</span>!
+                    </div>
+                </div>
+
+                <!-- Coluna de Upgrades -->
+                <div class="box">
+                    <h3>PEÇAS / UPGRADES</h3>
+                    <button id="btn-engine" onclick="buyUpgrade('engine')">Motor Nv.1 (R$ 250)</button>
+                    <button id="btn-turbo" onclick="buyUpgrade('turbo')">Turbo Nv.1 (R$ 300)</button>
+                    <button id="btn-tires" onclick="buyUpgrade('tires')">Pneus Nv.1 (R$ 200)</button>
+                </div>
+            </div>
+
+            <button class="btn-race" onclick="startRace()">INICIAR CORRIDA</button>
+            <div class="controls-hint">
+                Controles: <span class="key">W</span> ou <span class="key">↑</span> Acelerar | 
+                <span class="key">E</span> ou <span class="key">→</span> Subir Marcha | 
+                <span class="key">Q</span> ou <span class="key">←</span> Reduzir Marcha
+            </div>
+        </div>
+
+        <!-- TELA 2: RESULTADO DA CORRIDA -->
+        <div id="result-screen" class="overlay hidden">
+            <h2 id="result-title" style="font-size: 36px; margin-bottom: 10px;">VITÓRIA!</h2>
+            <p id="result-desc" style="font-size: 18px; margin-bottom: 15px;">Você cruzou a linha de chegada primeiro!</p>
+            <p id="result-prize" style="font-size: 22px; color: #4ade80; margin-bottom: 20px;">Prêmio: +R$ 300</p>
+            <button class="btn-race" onclick="openGarage()">VOLTAR PARA GARAGEM</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * ============================================================================
+ * 1. CONFIGURAÇÕES INICIAIS E VARIÁVEIS GLOBAIS
+ * ============================================================================
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Dados persistentes do jogador (Dinheiro, cor e níveis das peças)
+const playerData = {
+    money: 500,
+    color: '#e63946',
+    upgrades: {
+        engine: 1, // Aumenta velocidade máxima e potência
+        turbo: 1,  // Aumenta aceleração em altas rotações
+        tires: 1   // Aumenta arrancada inicial (aderência)
+    }
+};
+
+// Estados possíveis do jogo: 'GARAGE', 'COUNTDOWN', 'RACING', 'FINISHED'
+let gameState = 'GARAGE';
+const TRACK_LENGTH = 4000; // Distância da pista em pixels (equivale a 400 metros)
+let lastTime = 0;
+
+// Controles do teclado
+const keys = {
+    gas: false
+};
+
+// Sistema de partículas (fumaça dos pneus e fogo do escapamento)
+let particles = [];
+
+/**
+ * ============================================================================
+ * 2. SISTEMA DE ÁUDIO SINTETIZADO (WEB AUDIO API)
+ * Gera som de motor e troca de marcha sem precisar de arquivos MP3/WAV
+ * ============================================================================
+ */
+let audioCtx = null;
+let engineOsc = null;
+let engineGain = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Oscilador para simular o ronco do motor
+        engineOsc = audioCtx.createOscillator();
+        engineGain = audioCtx.createGain();
+        
+        engineOsc.type = 'sawtooth'; // Onda dente de serra lembra som de motor retrô
+        engineOsc.frequency.value = 50;
+        engineGain.gain.value = 0; // Começa mudo
+        
+        engineOsc.connect(engineGain);
+        engineGain.connect(audioCtx.destination);
+        engineOsc.start();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+// Atualiza o som do motor baseado no RPM atual
+function updateEngineSound(rpm, isRunning) {
+    if (!audioCtx || !engineOsc) return;
+    if (!isRunning) {
+        engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+        return;
+    }
+    // Mapeia RPM (1000 a 8000) para frequência sonora (45Hz a 220Hz)
+    const freq = 45 + (rpm / 8000) * 180;
+    engineOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.03);
+    engineGain.gain.setTargetAtTime(keys.gas ? 0.08 : 0.03, audioCtx.currentTime, 0.05);
+}
+
+// Efeito sonoro curto para troca de marcha (espirro do turbo)
+function playShiftSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.15);
+    
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+}
+
+/**
+ * ============================================================================
+ * 3. LÓGICA DOS CARROS (FÍSICA SIMPLIFICADA DE ARRANCADA)
+ * ============================================================================
+ */
+class Car {
+    constructor(isPlayer, color) {
+        this.isPlayer = isPlayer;
+        this.color = color;
+        this.reset();
+    }
+
+    reset() {
+        this.x = 0;               // Posição na pista
+        this.speed = 0;           // Velocidade atual
+        this.rpm = 1000;          // Rotações por minuto (1000 a 8000)
+        this.gear = 0;            // 0 = Neutro (N), 1 a 5 = Marchas
+        this.finished = false;
+        this.finishTime = 0;
+        
+        // Relações de marcha (quanto maior a marcha, maior a velocidade final e menor o torque)
+        this.gearRatios = [0, 3.2, 2.2, 1.6, 1.2, 0.9];
+    }
+
+    shiftUp() {
+        if (this.gear < 5) {
+            this.gear++;
+            // Ao subir a marcha, o RPM cai proporcionalmente
+            this.rpm = Math.max(2000, this.rpm * 0.62);
+            if (this.isPlayer) {
+                playShiftSound();
+                // Solta uma faísca/fogo do escapamento ao trocar marcha em alta rotação
+                spawnExhaustFlame(this.x, this.isPlayer ? 335 : 275);
+            }
+        }
+    }
+
+    shiftDown() {
+        if (this.gear > 1) {
+            this.gear--;
+            this.rpm = Math.min(8000, this.rpm * 1.45);
+            if (this.isPlayer) playShiftSound();
+        }
+    }
+
+    update(dt, accelerating) {
+        // Define potência com base nos upgrades (se for jogador) ou dificuldade fixa (CPU)
+        const engineMult = this.isPlayer ? (1 + (playerData.upgrades.engine - 1) * 0.18) : 1.15;
+        const turboMult  = this.isPlayer ? (1 + (playerData.upgrades.turbo - 1) * 0.15) : 1.10;
+        const tireGrip   = this.isPlayer ? (1 + (playerData.upgrades.tires - 1) * 0.20) : 1.15;
+
+        // Se estiver em Neutro (N), apenas sobe o giro do motor parado
+        if (this.gear === 0) {
+            if (accelerating) {
+                this.rpm += 6500 * dt;
+                if (this.rpm > 8000) this.rpm = 7800 + Math.random() * 200; // Corte de giro
+            } else {
+                this.rpm = Math.max(1000, this.rpm - 5000 * dt);
+            }
+            return;
+        }
+
+        // Em marcha engatada (1 a 5):
+        const ratio = this.gearRatios[this.gear];
+        
+        if (accelerating) {
+            // Eficiência do motor: melhor entre 4500 e 7200 RPM
+            let torqueCurve = 1.0;
+            if (this.rpm < 3000) torqueCurve = 0.65;
+            if (this.rpm > 7400) torqueCurve = 0.4; // Perde força se passar do ponto de troca
+
+            const accel = 180 * ratio * torqueCurve * engineMult * (this.rpm > 4500 ? turboMult : 1);
+            this.speed += accel * dt;
+
+            // Fumaça nos pneus na arrancada (1ª marcha)
+            if (this.gear === 1 && this.speed < 180 && Math.random() < 0.6) {
+                spawnTireSmoke(this.x, this.isPlayer ? 350 : 290);
+            }
+        } else {
+            // Freio motor / resistência do ar
+            this.speed = Math.max(0, this.speed - 90 * dt);
+        }
+
+        // Limite de velocidade máxima por marcha
+        const maxSpeedForGear = (820 / ratio) * engineMult;
+        if (this.speed > maxSpeedForGear) {
+            this.speed = maxSpeedForGear;
+        }
+
+        // Calcula o RPM com base na velocidade atual e na marcha engatada
+        this.rpm = 1000 + (this.speed / maxSpeedForGear) * 7000;
+        if (this.rpm > 8000) this.rpm = 8000;
+
+        // Atualiza posição na pista
+        this.x += this.speed * dt * (tireGrip * 0.9);
+
+        // Lógica automática da CPU para trocar de marcha
+        if (!this.isPlayer && gameState === 'RACING') {
+            if (this.gear === 0) this.shiftUp();
+            // CPU troca de marcha perto de 6900 RPM
+            if (this.rpm >= 6900 && this.gear < 5) {
+                this.shiftUp();
+            }
+        }
+    }
+}
+
+const playerCar = new Car(true, playerData.color);
+const cpuCar = new Car(false, '#00b4d8');
+
+/**
+ * ============================================================================
+ * 4. SISTEMA DE SEMÁFORO E FLUXO DE CORRIDA
+ * ============================================================================
+ */
+let lightState = 0; // 0: apagado, 1: luz 1, 2: luz 2, 3: luz 3, 4: VERDE!
+let lightTimer = 0;
+let raceTimer = 0;
+
+function startRace() {
+    initAudio();
+    document.getElementById('garage-screen').classList.add('hidden');
+    document.getElementById('result-screen').classList.add('hidden');
+
+    playerCar.color = playerData.color;
+    playerCar.reset();
+    cpuCar.reset();
+    particles = [];
+
+    gameState = 'COUNTDOWN';
+    lightState = 0;
+    lightTimer = 0;
+    raceTimer = 0;
+}
+
+function finishRace(won, reason) {
+    gameState = 'FINISHED';
+    updateEngineSound(0, false);
+
+    const titleEl = document.getElementById('result-title');
+    const descEl = document.getElementById('result-desc');
+    const prizeEl = document.getElementById('result-prize');
+
+    if (won) {
+        const prize = 300;
+        playerData.money += prize;
+        titleEl.innerText = "VITÓRIA!";
+        titleEl.style.color = "#4ade80";
+        descEl.innerText = `${reason} Tempo: ${raceTimer.toFixed(2)}s`;
+        prizeEl.innerText = `Prêmio: +R$ ${prize}`;
+    } else {
+        const consolation = 50;
+        playerData.money += consolation;
+        titleEl.innerText = "DERROTA!";
+        titleEl.style.color = "#e63946";
+        descEl.innerText = reason;
+        prizeEl.innerText = `Participação: +R$ ${consolation}`;
+    }
+
+    document.getElementById('result-screen').classList.remove('hidden');
+}
+
+function openGarage() {
+    document.getElementById('result-screen').classList.add('hidden');
+    document.getElementById('garage-screen').classList.remove('hidden');
+    gameState = 'GARAGE';
+    updateGarageUI();
+}
+
+/**
+ * ============================================================================
+ * 5. GARAGEM E UPGRADES
+ * ============================================================================
+ */
+function changeColor(hex) {
+    playerData.color = hex;
+}
+
+function buyUpgrade(type) {
+    const level = playerData.upgrades[type];
+    if (level >= 5) return; // Nível máximo 5
+
+    const baseCosts = { engine: 250, turbo: 300, tires: 200 };
+    const cost = baseCosts[type] * level;
+
+    if (playerData.money >= cost) {
+        playerData.money -= cost;
+        playerData.upgrades[type]++;
+        updateGarageUI();
+    }
+}
+
+function updateGarageUI() {
+    document.getElementById('money-text').innerText = playerData.money;
+
+    const types = [
+        { id: 'btn-engine', key: 'engine', name: 'Motor', base: 250 },
+        { id: 'btn-turbo',  key: 'turbo',  name: 'Turbo', base: 300 },
+        { id: 'btn-tires',  key: 'tires',  name: 'Pneus', base: 200 }
+    ];
+
+    types.forEach(item => {
+        const btn = document.getElementById(item.id);
+        const lvl = playerData.upgrades[item.key];
+        if (lvl >= 5) {
+            btn.innerText = `${item.name} MAX`;
+            btn.disabled = true;
+        } else {
+            const cost = item.base * lvl;
+            btn.innerText = `${item.name} Nv.${lvl} (R$ ${cost})`;
+            btn.disabled = playerData.money < cost;
+        }
+    });
+}
+
+/**
+ * ============================================================================
+ * 6. GRÁFICOS PIXEL ART DESENHADOS VIA CÓDIGO (<CANVAS>)
+ * ============================================================================
+ */
+
+// Gera fumaça dos pneus
+function spawnTireSmoke(carX, carY) {
+    particles.push({
+        x: carX + 15,
+        y: carY,
+        vx: -40 - Math.random() * 40,
+        vy: -10 - Math.random() * 20,
+        size: 8 + Math.random() * 8,
+        alpha: 0.8,
+        color: '#dddddd'
+    });
+}
+
+// Gera fogo do escapamento na troca de marcha
+function spawnExhaustFlame(carX, carY) {
+    for (let i = 0; i < 5; i++) {
+        particles.push({
+            x: carX + 5,
+            y: carY,
+            vx: -100 - Math.random() * 80,
+            vy: (Math.random() - 0.5) * 30,
+            size: 6,
+            alpha: 1.0,
+            color: i % 2 === 0 ? '#ffbe0b' : '#fb5607'
+        });
+    }
+}
+
+// Desenha um carro estilo Pixel Art usando retângulos
+function drawPixelCar(screenX, screenY, color, wheelRotation) {
+    ctx.save();
+    ctx.translate(Math.floor(screenX), Math.floor(screenY));
+
+    // Sombra embaixo do carro
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(6, 36, 108, 8);
+
+    // Aerofólio traseiro (estilo JDM)
+    ctx.fillStyle = '#111';
+    ctx.fillRect(4, 10, 6, 12);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 8, 14, 4);
+
+    // Carroceria principal (parte inferior)
+    ctx.fillStyle = color;
+    ctx.fillRect(8, 20, 104, 16);
+    // Para-choque dianteiro e traseiro
+    ctx.fillStyle = '#222';
+    ctx.fillRect(4, 28, 6, 8);
+    ctx.fillRect(110, 28, 6, 8);
+
+    // Cabine / Teto
+    ctx.fillStyle = color;
+    ctx.fillRect(28, 8, 52, 12);
+
+    // Vidros (escuridão interna + reflexo)
+    ctx.fillStyle = '#1d2d44';
+    ctx.fillRect(32, 10, 20, 10); // Vidro traseiro
+    ctx.fillRect(56, 10, 20, 10); // Vidro dianteiro
+    // Reflexo no vidro
+    ctx.fillStyle = '#748cab';
+    ctx.fillRect(60, 12, 4, 6);
+
+    // Farol dianteiro e lanterna traseira
+    ctx.fillStyle = '#fff3b0'; // Farol
+    ctx.fillRect(110, 22, 4, 5);
+    ctx.fillStyle = '#ff0000'; // Lanterna
+    ctx.fillRect(6, 22, 4, 5);
+
+    // Rodas (Traseira e Dianteira)
+    drawWheel(26, 34, wheelRotation);
+    drawWheel(92, 34, wheelRotation);
+
+    ctx.restore();
+}
+
+function drawWheel(wx, wy, rot) {
+    // Pneu
+    ctx.fillStyle = '#111';
+    ctx.fillRect(wx - 10, wy - 10, 20, 20);
+    // Roda/Aro cinza
+    ctx.fillStyle = '#adb5bd';
+    ctx.fillRect(wx - 6, wy - 6, 12, 12);
+    // Detalhe que gira para dar sensação de velocidade
+    ctx.fillStyle = '#333';
+    if (Math.floor(rot) % 2 === 0) {
+        ctx.fillRect(wx - 6, wy - 1, 12, 2);
+    } else {
+        ctx.fillRect(wx - 1, wy - 6, 2, 12);
+    }
+}
+
+// Desenha o cenário com efeito Parallax (céu entardecer, prédios, arquibancada e pista)
+function drawBackground(cameraX) {
+    // 1. Céu gradiente pôr do sol retrô
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, 240);
+    skyGrad.addColorStop(0, '#1a1423');
+    skyGrad.addColorStop(0.5, '#6b2d5c');
+    skyGrad.addColorStop(1, '#f07167');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, 240);
+
+    // Sol retrô no horizonte
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.arc(620, 160, 45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Silhueta da cidade ao fundo (Parallax lento: 0.15x da câmera)
+    ctx.fillStyle = '#251d3a';
+    const cityOffset = -(cameraX * 0.15) % 400;
+    for (let i = -1; i < 4; i++) {
+        const bx = i * 400 + cityOffset;
+        ctx.fillRect(bx + 20, 130, 50, 110);
+        ctx.fillRect(bx + 80, 100, 65, 140);
+        ctx.fillRect(bx + 160, 145, 45, 95);
+        ctx.fillRect(bx + 220, 90, 70, 150);
+        ctx.fillRect(bx + 310, 125, 60, 115);
+    }
+
+    // 3. Muro / Arquibancada (Parallax médio: 0.5x da câmera)
+    ctx.fillStyle = '#3d405b';
+    ctx.fillRect(0, 210, canvas.width, 35);
+    const wallOffset = -(cameraX * 0.5) % 100;
+    ctx.fillStyle = '#e63946';
+    for (let x = wallOffset; x < canvas.width; x += 100) {
+        ctx.fillRect(x, 235, 50, 10);
+    }
+
+    // 4. Asfalto da Pista (Velocidade real: 1.0x da câmera)
+    ctx.fillStyle = '#2b2d42';
+    ctx.fillRect(0, 245, canvas.width, 135);
+
+    // Faixa divisória central tracejada
+    ctx.fillStyle = '#edf2f4';
+    const stripeOffset = -(cameraX % 80);
+    for (let x = stripeOffset; x < canvas.width; x += 80) {
+        ctx.fillRect(x, 310, 40, 4);
+    }
+
+    // Linha de Largada e Linha de Chegada
+    const startLineScreenX = 120 - cameraX;
+    if (startLineScreenX > -20 && startLineScreenX < canvas.width) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(startLineScreenX, 245, 8, 135);
+    }
+
+    const finishLineScreenX = (120 + TRACK_LENGTH) - cameraX;
+    if (finishLineScreenX > -50 && finishLineScreenX < canvas.width) {
+        // Padrão quadriculado na linha de chegada
+        for (let row = 0; row < 13; row++) {
+            for (let col = 0; col < 3; col++) {
+                ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#111111';
+                ctx.fillRect(finishLineScreenX + col * 10, 245 + row * 10, 10, 10);
+            }
+        }
+    }
+
+    // Gramado inferior
+    ctx.fillStyle = '#1b4332';
+    ctx.fillRect(0, 380, canvas.width, 70);
+}
+
+// Desenha o semáforo de largada ("Árvore de Natal" de Drag Race)
+function drawTrafficLight(cameraX) {
+    const lightX = 240 - cameraX;
+    if (lightX < -50) return;
+
+    // Poste e caixa do semáforo
+    ctx.fillStyle = '#111';
+    ctx.fillRect(lightX, 110, 28, 100);
+    ctx.fillRect(lightX + 10, 210, 8, 35);
+
+    // Luz 1 (Vermelha)
+    ctx.fillStyle = lightState >= 1 && lightState < 4 ? '#ff0000' : '#4a0000';
+    ctx.beginPath(); ctx.arc(lightX + 14, 130, 8, 0, Math.PI * 2); ctx.fill();
+
+    // Luz 2 (Vermelha)
+    ctx.fillStyle = lightState >= 2 && lightState < 4 ? '#ff0000' : '#4a0000';
+    ctx.beginPath(); ctx.arc(lightX + 14, 155, 8, 0, Math.PI * 2); ctx.fill();
+
+    // Luz 3 (Amarela)
+    ctx.fillStyle = lightState === 3 ? '#ffbe0b' : '#4a3800';
+    ctx.beginPath(); ctx.arc(lightX + 14, 180, 8, 0, Math.PI * 2); ctx.fill();
+
+    // Luz 4 (VERDE - LARGADA!)
+    ctx.fillStyle = lightState === 4 ? '#00ff00' : '#003b00';
+    ctx.beginPath(); ctx.arc(lightX + 14, 200, 8, 0, Math.PI * 2); ctx.fill();
+}
+
+/**
+ * ============================================================================
+ * 7. PAINEL DO CARRO (HUD: CONTA-GIROS, MARCHA, VELOCIDADE E PROGRESSO)
+ * ============================================================================
+ */
+function drawHUD() {
+    // Fundo do painel inferior
+    ctx.fillStyle = '#111118';
+    ctx.fillRect(0, 380, canvas.width, 70);
+    ctx.fillStyle = '#444';
+    ctx.fillRect(0, 380, canvas.width, 3);
+
+    // 1. BARRA DE RPM (Conta-giros)
+    const barX = 20;
+    const barY = 405;
+    const barW = 320;
+    const barH = 26;
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px Courier New';
+    ctx.fillText(`RPM: ${Math.floor(playerCar.rpm)}`, barX, 398);
+
+    // Fundo da barra
+    ctx.fillStyle = '#222';
+    ctx.fillRect(barX, barY, barW, barH);
+
+    // Zona Verde Ideal para troca de marcha (entre 6200 e 7300 RPM)
+    const greenStart = (6200 / 8000) * barW;
+    const greenWidth = ((7300 - 6200) / 8000) * barW;
+    ctx.fillStyle = 'rgba(74, 222, 128, 0.35)';
+    ctx.fillRect(barX + greenStart, barY, greenWidth, barH);
+
+    // Preenchimento atual do RPM
+    const rpmRatio = Math.min(1, playerCar.rpm / 8000);
+    let rpmColor = '#3a86ff'; // Azul normal
+    if (playerCar.rpm >= 6200 && playerCar.rpm <= 7300) rpmColor = '#4ade80'; // Verde (Troca ideal!)
+    if (playerCar.rpm > 7300) rpmColor = '#e63946'; // Vermelho (Corte de giro!)
+
+    ctx.fillStyle = rpmColor;
+    ctx.fillRect(barX, barY, barW * rpmRatio, barH);
+
+    // Borda do conta-giros
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // 2. INDICADOR DE MARCHA (N, 1, 2, 3, 4, 5)
+    ctx.fillStyle = '#222';
+    ctx.fillRect(365, 390, 50, 50);
+    ctx.strokeStyle = '#ffcc00';
+    ctx.strokeRect(365, 390, 50, 50);
+
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 32px Courier New';
+    const gearText = playerCar.gear === 0 ? 'N' : playerCar.gear;
+    ctx.fillText(gearText, 380, 426);
+
+    // 3. VELOCÍMETRO (KM/H)
+    const kmh = Math.floor(playerCar.speed * 0.45);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px Courier New';
+    ctx.fillText(`${kmh} KM/H`, 440, 422);
+
+    // 4. BARRA DE PROGRESSO DA CORRIDA (Minimapa superior)
+    const progX = 150;
+    const progY = 20;
+    const progW = 500;
+    const progH = 14;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(progX, progY, progW, progH);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(progX, progY, progW, progH);
+
+    // Posição da CPU no minimapa
+    const cpuProg = Math.min(1, cpuCar.x / TRACK_LENGTH);
+    ctx.fillStyle = cpuCar.color;
+    ctx.fillRect(progX + cpuProg * (progW - 10), progY + 2, 10, 4);
+
+    // Posição do Jogador no minimapa
+    const playerProg = Math.min(1, playerCar.x / TRACK_LENGTH);
+    ctx.fillStyle = playerCar.color;
+    ctx.fillRect(progX + playerProg * (progW - 10), progY + 8, 10, 4);
+
+    // Cronômetro
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Courier New';
+    ctx.fillText(`TEMPO: ${raceTimer.toFixed(2)}s`, 670, 32);
+}
+
+/**
+ * ============================================================================
+ * 8. LOOP PRINCIPAL DO JOGO (UPDATE + DRAW)
+ * ============================================================================
+ */
+function update(dt) {
+    if (gameState === 'GARAGE' || gameState === 'FINISHED') return;
+
+    // Lógica da contagem regressiva do semáforo
+    if (gameState === 'COUNTDOWN') {
+        lightTimer += dt;
+        if (lightTimer > 0.8) {
+            lightState++;
+            lightTimer = 0;
+            if (lightState === 4) {
+                gameState = 'RACING'; // Luz verde! Começa a corrida
+            }
+        }
+
+        // Permite acelerar no Neutro antes da largada, mas se engatar marcha antes do verde = QUEIMA!
+        playerCar.update(dt, keys.gas);
+        updateEngineSound(playerCar.rpm, true);
+
+        if (playerCar.gear > 0 && lightState < 4) {
+            finishRace(false, "QUEIMA DE LARGADA (False Start)! Espere a luz verde.");
+        }
+    }
+
+    // Lógica durante a corrida
+    if (gameState === 'RACING') {
+        raceTimer += dt;
+
+        playerCar.update(dt, keys.gas);
+        cpuCar.update(dt, true);
+        updateEngineSound(playerCar.rpm, true);
+
+        // Verifica quem cruzou a linha de chegada primeiro
+        if (playerCar.x >= TRACK_LENGTH) {
+            finishRace(true, "Você venceu a arrancada!");
+        } else if (cpuCar.x >= TRACK_LENGTH) {
+            finishRace(false, "O oponente cruzou a linha de chegada primeiro!");
+        }
+    }
+
+    // Atualiza partículas (fumaça e fogo)
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.alpha -= 1.5 * dt;
+        if (p.alpha <= 0) particles.splice(i, 1);
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // A câmera acompanha o carro do jogador mantendo-o à esquerda da tela
+    const cameraX = playerCar.x;
+
+    // 1. Cenário e pista
+    drawBackground(cameraX);
+
+    // 2. Semáforo de largada
+    drawTrafficLight(cameraX);
+
+    // 3. Partículas (fumaça/fogo)
+    particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillRect(100 + (p.x - cameraX), p.y, p.size, p.size);
+        ctx.globalAlpha = 1.0;
+    });
+
+    // 4. Desenha o carro da CPU (pista de cima) e o do Jogador (pista de baixo)
+    const cpuScreenX = 100 + (cpuCar.x - cameraX);
+    drawPixelCar(cpuScreenX, 255, cpuCar.color, cpuCar.x * 0.1);
+    drawPixelCar(100, 315, playerCar.color, playerCar.x * 0.1);
+
+    // 5. Painel HUD
+    drawHUD();
+
+    // Aviso visual na contagem regressiva
+    if (gameState === 'COUNTDOWN') {
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 24px Courier New';
+        ctx.fillText("PREPARE-SE! (Acelere no Neutro e engate a 1ª no VERDE)", 65, 80);
+    }
+}
+
+function gameLoop(timestamp) {
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Limita dt para evitar saltos
+    lastTime = timestamp;
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * ============================================================================
+ * 9. EVENTOS DE TECLADO E INICIALIZAÇÃO
+ * ============================================================================
+ */
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    
+    // Acelerar (W ou Seta para Cima)
+    if (key === 'w' || e.key === 'ArrowUp') {
+        keys.gas = true;
+    }
+
+    // Subir marcha (E ou Seta para Direita)
+    if (key === 'e' || e.key === 'ArrowRight') {
+        if (gameState === 'COUNTDOWN' || gameState === 'RACING') {
+            playerCar.shiftUp();
+        }
+    }
+
+    // Reduzir marcha (Q ou Seta para Esquerda)
+    if (key === 'q' || e.key === 'ArrowLeft') {
+        if (gameState === 'COUNTDOWN' || gameState === 'RACING') {
+            playerCar.shiftDown();
+        }
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || e.key === 'ArrowUp') {
+        keys.gas = false;
+    }
+});
+
+// Inicializa a interface da garagem e inicia o loop gráfico
+updateGarageUI();
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
